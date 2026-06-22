@@ -3,6 +3,7 @@ import subprocess
 import json
 from dataclasses import dataclass
 from envguard import engine
+from envguard.logger import debug
 
 class GhostEnvironmentConflictError(Exception):
     pass
@@ -39,6 +40,7 @@ def find_target_python():
     Implements f-1 to f-4.
     """
     virtual_env = os.environ.get("VIRTUAL_ENV")
+    debug(f"[Audit] VIRTUAL_ENV from environ: {virtual_env}")
     
     # Upward traversal
     cwd = os.getcwd()
@@ -59,6 +61,8 @@ def find_target_python():
             break
         cwd = parent
 
+    debug(f"[Audit] Upward venv traversal found: {upward_venv}")
+
     # f-2: Ghost Environment Conflict
     if virtual_env and upward_venv and os.path.realpath(virtual_env) != os.path.realpath(upward_venv):
         raise GhostEnvironmentConflictError(
@@ -73,10 +77,12 @@ def find_target_python():
         python_exe = os.path.join(target_prefix, "bin", "python")
         if not os.path.exists(python_exe):
             python_exe = os.path.join(target_prefix, "bin", "python3")
+        debug(f"[Audit] Target python resolved to {python_exe} via prefix {target_prefix}")
         return python_exe, target_prefix
         
     # f-4 Fallback
     fallback_python = engine.get_active_python()
+    debug(f"[Audit] No venv found, falling back to active python: {fallback_python}")
     return fallback_python, None
 
 def run_audit_probe(python_exe: str):
@@ -95,12 +101,14 @@ def run_audit_probe(python_exe: str):
     })
 
     try:
+        debug(f"[Audit] Running probe script '{probe_path}' with target python: {python_exe}")
         output = subprocess.check_output(
             [python_exe, probe_path], 
             input=config_payload,
             text=True, 
             stderr=subprocess.PIPE
         )
+        debug(f"[Audit] Probe executed successfully. Parsing {len(output)} bytes of output.")
         return json.loads(output)
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"Failed to run audit probe on {python_exe}: {e.stderr}")
