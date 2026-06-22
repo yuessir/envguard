@@ -66,6 +66,6 @@ venv.bak/
 *.swo
 
 # spec
-md/*.md
+spec/*.md
 
 
