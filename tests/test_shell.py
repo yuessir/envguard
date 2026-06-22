@@ -47,6 +47,37 @@ def test_shell_hook_preserves_alias(shell):
     assert "MY_CUSTOM_ALIAS" in result.stdout
 
 @pytest.mark.parametrize("shell", ["bash", "zsh"])
+def test_shell_hook_preserves_function(shell):
+    if not shutil.which(shell):
+        pytest.skip(f"{shell} is not installed on this system.")
+        
+    script_path = get_script_path(shell)
+    
+    # We create a small script that defines a function, sources envguard, and runs the function.
+    test_script = f"""
+    function pip() {{
+        echo "MY_CUSTOM_FUNCTION"
+    }}
+    source "{script_path}"
+    pip
+    """
+    
+    cmd_args = [shell, "-c", test_script]
+        
+    result = subprocess.run(
+        cmd_args,
+        capture_output=True,
+        text=True
+    )
+    
+    # 1. Check that EnvGuard printed the warning to stderr
+    assert "EnvGuard Warning" in result.stderr
+    assert "Detected existing shell function for 'pip'" in result.stderr
+    
+    # 2. Check that the function actually survived and executed
+    assert "MY_CUSTOM_FUNCTION" in result.stdout
+
+@pytest.mark.parametrize("shell", ["bash", "zsh"])
 def test_shell_hook_normal_execution(shell, tmp_path):
     if not shutil.which(shell):
         pytest.skip(f"{shell} is not installed on this system.")

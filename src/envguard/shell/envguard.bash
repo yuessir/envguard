@@ -37,6 +37,8 @@ fi
 for cmd in $TOOLS; do
     if ALIAS_DEF=$(alias "$cmd" 2>/dev/null); then
         echo -e "\033[93m[EnvGuard Warning] Detected alias for '$cmd' ($ALIAS_DEF). EnvGuard will NOT intercept this command to preserve your alias.\033[0m" >&2
+    elif [ "$(type -t "$cmd")" = "function" ]; then
+        echo -e "\033[93m[EnvGuard Warning] Detected existing shell function for '$cmd'. EnvGuard will NOT intercept this command to prevent breaking your environment (e.g., conda/nvm).\033[0m" >&2
     else
         eval "
         function $cmd() {
