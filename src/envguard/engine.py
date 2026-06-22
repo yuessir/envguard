@@ -87,22 +87,38 @@ def detect_venv(executable_path: str) -> bool:
         bin_dir = os.path.dirname(executable_path)
         env_dir = os.path.dirname(bin_dir)
         pyvenv_cfg = os.path.join(env_dir, "pyvenv.cfg")
+        conda_history = os.path.join(env_dir, "conda-meta", "history")
         
-        if not os.path.isfile(pyvenv_cfg):
-            return False
+        is_pep405 = os.path.isfile(pyvenv_cfg)
+        is_conda = os.path.isfile(conda_history)
+        
+        if not (is_pep405 or is_conda):
+            # Check for Windows conda (python.exe in env_dir directly, so bin_dir IS env_dir)
+            conda_history_win = os.path.join(bin_dir, "conda-meta", "history")
+            if os.path.isfile(conda_history_win):
+                is_conda = True
+                env_dir = bin_dir
+            else:
+                return False
             
-        # PEP 405 strictness: check if lib/python*/site-packages exists
-        lib_dir = os.path.join(env_dir, "lib")
-        if not os.path.isdir(lib_dir):
+        # PEP 405 / Conda strictness: check if lib/python*/site-packages exists
+        if is_pep405 or (is_conda and os.name != 'nt'):
+            lib_dir = os.path.join(env_dir, "lib")
+            if not os.path.isdir(lib_dir):
+                return False
+                
+            for py_dir in os.listdir(lib_dir):
+                if py_dir.startswith("python"):
+                    site_packages = os.path.join(lib_dir, py_dir, "site-packages")
+                    if os.path.isdir(site_packages):
+                        return True
+                        
             return False
-            
-        for py_dir in os.listdir(lib_dir):
-            if py_dir.startswith("python"):
-                site_packages = os.path.join(lib_dir, py_dir, "site-packages")
-                if os.path.isdir(site_packages):
-                    return True
-                    
-        return False
+        elif is_conda and os.name == 'nt':
+            site_packages = os.path.join(env_dir, "Lib", "site-packages")
+            if os.path.isdir(site_packages):
+                return True
+            return False
     except Exception as e:
         logger.debug(f"Error in detect_venv for {executable_path}: {e}")
         return False

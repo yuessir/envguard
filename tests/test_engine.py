@@ -44,6 +44,27 @@ def test_detect_venv(tmp_path):
 
     assert engine.detect_venv(str(global_python)) is False
 
+def test_detect_conda_venv(tmp_path):
+    # Mock a Conda venv structure
+    conda_dir = tmp_path / "miniconda3" / "envs" / "myenv"
+    conda_dir.mkdir(parents=True)
+    
+    # Conda environments use conda-meta/history instead of pyvenv.cfg
+    conda_meta = conda_dir / "conda-meta"
+    conda_meta.mkdir()
+    (conda_meta / "history").touch()
+    
+    bin_dir = conda_dir / "bin"
+    bin_dir.mkdir()
+    python_exec = bin_dir / "python"
+    python_exec.touch()
+    
+    # Must have lib/pythonX.X/site-packages
+    lib_dir = conda_dir / "lib" / "python3.10" / "site-packages"
+    lib_dir.mkdir(parents=True)
+
+    assert engine.detect_venv(str(python_exec)) is True
+
 def test_detect_uv_venv(tmp_path):
     # UV creates PEP 405 compliant virtual environments.
     # It also might use hardlinks or copy depending on OS, but always creates pyvenv.cfg
