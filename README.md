@@ -1,5 +1,7 @@
 # EnvGuard
 
+[English](README.md) | [繁體中文](README.zh-TW.md) | [简体中文](README.zh-CN.md)
+
 EnvGuard is a cross-environment CLI interceptor and path conflict diagnostic tool for Python.
 It prevents common issues caused by misaligned paths between global tools, system environments, and virtual environments (`venv`).
 
