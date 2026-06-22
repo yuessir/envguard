@@ -81,6 +81,40 @@ def test_hook_exec_misaligned(capsys):
     captured = capsys.readouterr()
     assert msg in captured.err
 
+@patch("builtins.input", return_value="Y")
+def test_hook_exec_require_confirmation_yes(mock_input, capsys):
+    mock_args = MagicMock()
+    mock_args.command = "pip"
+    mock_args.executable = "/usr/bin/pip"
+    mock_args.python = None
+    mock_args.args = ["install", "--break-system-packages"]
+    
+    msg = "[WARNING] You are using --break-system-packages interactively."
+    with patch("envguard.hook.check_alignment", return_value={"aligned": False, "require_confirmation": True, "message": msg}):
+        cli.hook_exec(mock_args)
+    
+    captured = capsys.readouterr()
+    # It should not exit, and should ask for Y
+    assert "Do you want to proceed anyway?" in captured.err
+
+@patch("builtins.input", return_value="n")
+def test_hook_exec_require_confirmation_no(mock_input, capsys):
+    mock_args = MagicMock()
+    mock_args.command = "pip"
+    mock_args.executable = "/usr/bin/pip"
+    mock_args.python = None
+    mock_args.args = ["install", "--break-system-packages"]
+    
+    msg = "[WARNING] You are using --break-system-packages interactively."
+    with patch("envguard.hook.check_alignment", return_value={"aligned": False, "require_confirmation": True, "message": msg}):
+        with pytest.raises(SystemExit) as excinfo:
+            cli.hook_exec(mock_args)
+        assert excinfo.value.code == 1
+    
+    captured = capsys.readouterr()
+    assert "Do you want to proceed anyway?" in captured.err
+    assert "Execution aborted by EnvGuard." in captured.err
+
 def test_doctor(capsys):
     mock_args = MagicMock()
     

@@ -15,6 +15,19 @@ def hook_exec(args):
         print(f"{Colors.RED}{result.get('message', 'Execution aborted by EnvGuard.')}{Colors.RESET}", file=sys.stderr)
         sys.exit(1)
         
+    if result.get("require_confirmation"):
+        print_warning(result.get("message", ""))
+        sys.stderr.write(f"{Colors.YELLOW}Do you want to proceed anyway? Type 'Y' to continue: {Colors.RESET}")
+        try:
+            ans = input().strip()
+        except EOFError:
+            ans = ""
+        if ans != "Y":
+            print(f"\n{Colors.RED}Execution aborted by EnvGuard.{Colors.RESET}", file=sys.stderr)
+            sys.exit(1)
+        # If 'Y', just proceed silently
+        return
+        
     if not result.get("aligned", True) and result.get("message"):
         print_warning(result["message"])
 

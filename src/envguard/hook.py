@@ -79,6 +79,7 @@ def check_alignment(executable_path: str, command: str, active_python: str = Non
                 return {
                     "aligned": False,
                     "abort": False,
+                    "require_confirmation": True,
                     "message": "[WARNING] You are using --break-system-packages interactively.\nProceed with caution! This may break your OS Python installation.",
                     "tool_category": tool_env.get("category", "unknown")
                 }
