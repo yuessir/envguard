@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "envguard"
+version = "0.1.0"
+description = "A cross-environment CLI interceptor and path conflict diagnostic tool for Python."
+readme = "README.md"
+authors = [
+    { name = "Kevin" }
+]
+requires-python = ">=3.8"
+dependencies = []
+
+[project.scripts]
+envguard = "envguard.main:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/envguard"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

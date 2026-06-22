@@ -1,0 +1,161 @@
+{
+    "schema_version": "1.1",
+    "description": "EnvGuard 全域尋人雷達與環境特徵地圖 (基於實體倉庫分類)",
+    "managed_tools": {
+        "installer_tools": [
+            "pip",
+            "pip3",
+            "port",
+            "brew"
+        ],
+        "execution_tools": [
+            "pyinstaller",
+            "pytest",
+            "celery",
+            "uvicorn"
+        ],
+        "bypass_tools": [
+            "uv",
+            "uvx"
+        ]
+    },
+    "environments": [
+        {
+            "id": "pyenv_versions_env",
+            "name": "Pyenv 版本倉庫",
+            "type": "version_manager",
+            "path_patterns": [
+                "~/.pyenv/versions/*/lib/python*/site-packages"
+            ],
+            "shim_patterns": [
+                "~/.pyenv/shims"
+            ],
+            "description": "由 Pyenv 工具下載與管理的 Python 版本實體倉庫"
+        },
+        {
+            "id": "poetry_cache_env",
+            "name": "Poetry 全域快取環境",
+            "type": "virtual_environment",
+            "path_patterns": [
+                "~/Library/Caches/pypoetry/virtualenvs/*/lib/python*/site-packages",
+                "~/.cache/pypoetry/virtualenvs/*/lib/python*/site-packages"
+            ],
+            "description": "由 Poetry 專案管理工具在系統底層建立的集中式虛擬環境倉庫"
+        },
+        {
+            "id": "rye_toolchain_env",
+            "name": "Rye 工具鏈直譯器環境",
+            "type": "toolchain",
+            "path_patterns": [
+                "~/.rye/py/*/lib/python*/site-packages"
+            ],
+            "description": "由 Rye 全端工具鏈自行下載管理的底層 Python 直譯器倉庫"
+        },
+        {
+            "id": "conda_workspace_env",
+            "name": "Conda / Miniforge 隔離環境",
+            "type": "data_science_env",
+            "path_patterns": [
+                "~/anaconda3/envs/*/lib/python*/site-packages",
+                "~/miniconda3/envs/*/lib/python*/site-packages",
+                "~/miniforge3/envs/*/lib/python*/site-packages",
+                "~/.conda/envs/*/lib/python*/site-packages",
+                "/opt/homebrew/Caskroom/miniforge/base/envs/*/lib/python*/site-packages"
+            ],
+            "description": "資料科學領域中，由 Conda 相關指令建立的專屬隔離倉庫"
+        },
+        {
+            "id": "pipx_sandbox_env",
+            "name": "pipx 全域沙盒環境",
+            "type": "global_sandbox",
+            "path_patterns": [
+                "~/.local/pipx/venvs/*/lib/python*/site-packages"
+            ],
+            "description": "由 pipx 建立，專門用於隔離全域 CLI 工具的專屬沙盒倉庫"
+        },
+        {
+            "id": "uv_tool_sandbox_env",
+            "name": "uv tool 全域沙盒環境",
+            "type": "global_sandbox",
+            "path_patterns": [
+                "~/.local/share/uv/tools/*/lib/python*/site-packages"
+            ],
+            "description": "由 uv tool 指令建立的全域 CLI 工具獨立沙盒倉庫"
+        },
+        {
+            "id": "hatch_virtual_env",
+            "name": "Hatch 專案虛擬環境",
+            "type": "virtual_environment",
+            "path_patterns": [
+                "~/Library/Application Support/hatch/env/virtual/*/lib/python*/site-packages",
+                "~/.local/share/hatch/env/virtual/*/lib/python*/site-packages"
+            ],
+            "description": "由 Hatch 建立並集中管理的全域快取虛擬環境倉庫"
+        },
+        {
+            "id": "homebrew_global_env",
+            "name": "Homebrew 全域系統環境",
+            "type": "system_global",
+            "path_patterns": [
+                "/opt/homebrew/lib/python*/site-packages",
+                "/usr/local/lib/python*/site-packages",
+                "/usr/local/Cellar/python/*/lib/python*/site-packages"
+            ],
+            "description": "由 Homebrew (brew) 套件管理器建立的全域系統倉庫 (含 Apple Silicon 與 Intel 架構)"
+        },
+        {
+            "id": "macports_global_env",
+            "name": "MacPorts 全域系統環境",
+            "type": "system_global",
+            "path_patterns": [
+                "/opt/local/lib/python*/site-packages",
+                "/opt/local/Library/Frameworks/Python.framework/Versions/*/lib/python*/site-packages"
+            ],
+            "description": "由 MacPorts 套件管理器建立的全域系統倉庫"
+        },
+        {
+            "id": "macos_system_env",
+            "name": "官方/系統自帶全域環境",
+            "type": "system_global",
+            "path_patterns": [
+                "/Library/Frameworks/Python.framework/Versions/*/lib/python*/site-packages"
+            ],
+            "description": "Python.org 官方安裝包 (.pkg) 或 macOS 系統預設的全域倉庫"
+        },
+        {
+            "id": "user_site_env",
+            "name": "使用者層級全域環境",
+            "type": "user_global",
+            "path_patterns": [
+                "~/.local/lib/python*/site-packages",
+                "~/Library/Python/*/lib/python/site-packages"
+            ],
+            "description": "透過 pip install --user 寫入的使用者專屬全域倉庫"
+        }
+    ],
+    "module_mappings": {
+        "cv2": "opencv-python",
+        "bs4": "beautifulsoup4",
+        "PIL": "Pillow",
+        "yaml": "PyYAML",
+        "dotenv": "python-dotenv",
+        "jwt": "PyJWT",
+        "sklearn": "scikit-learn"
+    },
+    "blacklist_directories": [
+        "/dev",
+        "/System",
+        "/private",
+        "/var",
+        "/tmp",
+        "/Volumes",
+        "~/.Trash"
+    ],
+    "ghost_whitelist": [
+        "sitecustomize",
+        "usercustomize",
+        "README",
+        "__pycache__",
+        "_virtualenv"
+    ]
+}
