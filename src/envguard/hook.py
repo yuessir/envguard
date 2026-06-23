@@ -1,7 +1,16 @@
 import sys
 import os
 import re
+from dataclasses import dataclass
 from envguard import engine, logger
+
+@dataclass
+class AlignmentResult:
+    aligned: bool
+    abort: bool = False
+    require_confirmation: bool = False
+    message: str = ""
+    tool_category: str = "unknown"
 
 def extract_python_version(file_path: str):
     """Extract python version from path string, shebang, or by executing it."""
@@ -69,45 +78,44 @@ def check_alignment(executable_path: str, command: str, active_python: str = Non
         
         if command in installer_tools and "install" in args and "--break-system-packages" in args:
             if not sys.stdout.isatty():
-                return {
-                    "aligned": False,
-                    "abort": True,
-                    "message": "[DANGER] Attempted to use --break-system-packages in a non-interactive environment (CI/CD).\nEnvGuard has blocked this to prevent breaking the system environment.",
-                    "tool_category": tool_env.get("category", "unknown")
-                }
+                return AlignmentResult(
+                    aligned=False,
+                    abort=True,
+                    message="[DANGER] Attempted to use --break-system-packages in a non-interactive environment (CI/CD).\nEnvGuard has blocked this to prevent breaking the system environment.",
+                    tool_category=tool_env.get("category", "unknown")
+                )
             else:
-                return {
-                    "aligned": False,
-                    "abort": False,
-                    "require_confirmation": True,
-                    "message": "[WARNING] You are using --break-system-packages interactively.\nProceed with caution! This may break your OS Python installation.",
-                    "tool_category": tool_env.get("category", "unknown")
-                }
+                return AlignmentResult(
+                    aligned=False,
+                    require_confirmation=True,
+                    message="[WARNING] You are using --break-system-packages interactively.\nProceed with caution! This may break your OS Python installation.",
+                    tool_category=tool_env.get("category", "unknown")
+                )
         
         # Scenario 1: User is in a venv, but the tool is global
         if current_env["is_venv"] and not tool_env["is_venv"]:
             if command in bypass_tools:
                 # uv is intentionally a global tool that targets the active venv automatically.
                 # We bypass the mismatch warning for global uv.
-                pass
+                return AlignmentResult(aligned=True)
             elif command in installer_tools:
-                return {
-                    "aligned": False,
-                    "message": f"[WARNING] You are in a virtual environment, but using a global {command}.\n"
+                return AlignmentResult(
+                    aligned=False,
+                    message=f"[WARNING] You are in a virtual environment, but using a global {command}.\n"
                                f"Current Python: {current_env['real_path']}\n"
                                f"Tool Path: {tool_env['real_path']}\n"
                                f"This may install packages globally instead of in your venv.",
-                    "tool_category": tool_env["category"]
-                }
+                    tool_category=tool_env["category"]
+                )
             elif command in execution_tools:
-                return {
-                    "aligned": False,
-                    "message": f"[WARNING] You are in a virtual environment, but using a global {command}.\n"
+                return AlignmentResult(
+                    aligned=False,
+                    message=f"[WARNING] You are in a virtual environment, but using a global {command}.\n"
                                f"Current Python: {current_env['real_path']}\n"
                                f"Tool Path: {tool_env['real_path']}\n"
                                f"This may lead to ModuleNotFoundError as the global tool cannot see venv packages.",
-                    "tool_category": tool_env["category"]
-                }
+                    tool_category=tool_env["category"]
+                )
                 
         if not current_env["is_venv"] and not tool_env["is_venv"]:
             logger.debug("Both environments are global. Performing version alignment check...")
@@ -118,9 +126,9 @@ def check_alignment(executable_path: str, command: str, active_python: str = Non
                 tool_dir = os.path.dirname(tool_env['original_path'] if 'original_path' in tool_env else tool_env['real_path'])
                 command_clean = command.replace('3', '') if command.startswith('pip') else command
                 
-                return {
-                    "aligned": False,
-                    "message": f"[WARNING] Global Python Version Mismatch!\n"
+                return AlignmentResult(
+                    aligned=False,
+                    message=f"[WARNING] Global Python Version Mismatch!\n"
                                f"Active Python: {current_env['real_path']} (v{current_version})\n"
                                f"Tool Path: {tool_env['real_path']} (v{tool_version})\n"
                                f"Using this {command} will install/run against the wrong Python version.\n"
@@ -131,8 +139,8 @@ def check_alignment(executable_path: str, command: str, active_python: str = Non
                                f"🛠️  How to fix it:\n"
                                f"1. Safe bypass: Run 'python -m {command_clean}' instead of just '{command}'.\n"
                                f"2. Permanent fix: Clean up your $PATH configuration (e.g., in ~/.zshrc) to ensure your v{current_version} bin folder appears before other versions.\n",
-                    "tool_category": tool_env["category"]
-                }
+                    tool_category=tool_env["category"]
+                )
 
         # Future scenarios (like two different venvs) can be added here
         if current_env["is_venv"] and tool_env["is_venv"]:
@@ -140,19 +148,19 @@ def check_alignment(executable_path: str, command: str, active_python: str = Non
             current_venv_path = current_env["venv_path"]
             tool_venv_path = tool_env["venv_path"]
             if current_venv_path != tool_venv_path:
-                return {
-                    "aligned": False,
-                    "message": f"[WARNING] Environment mismatch!\n"
+                return AlignmentResult(
+                    aligned=False,
+                    message=f"[WARNING] Environment mismatch!\n"
                                f"Active venv: {current_venv_path}\n"
                                f"Tool's venv: {tool_venv_path}",
-                    "tool_category": tool_env["category"]
-                }
+                    tool_category=tool_env["category"]
+                )
                 
-        return {"aligned": True, "message": "", "tool_category": tool_env["category"]}
+        return AlignmentResult(aligned=True, message="", tool_category=tool_env["category"])
     except Exception as e:
         logger.debug(f"Hook encountered an error during check: {e}")
         # Silent Fail: If anything goes wrong, do not block the user.
-        return {"aligned": True, "message": "", "error": str(e), "tool_category": "unknown"}
+        return AlignmentResult(aligned=True, message="", tool_category="unknown")
 
 if __name__ == "__main__":
     import json
@@ -162,5 +170,6 @@ if __name__ == "__main__":
     parser.add_argument("command", help="The command name (e.g. pip, pyinstaller)")
     args = parser.parse_args()
     
+    import dataclasses
     result = check_alignment(args.executable, args.command)
-    print(json.dumps(result))
+    print(json.dumps(dataclasses.asdict(result)))

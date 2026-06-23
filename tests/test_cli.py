@@ -62,7 +62,7 @@ def test_hook_exec_aligned(capsys):
     mock_args.command = "pip"
     mock_args.executable = "/path/to/pip"
     
-    with patch("envguard.hook.check_alignment", return_value={"aligned": True}):
+    with patch("envguard.hook.check_alignment", return_value=MagicMock(aligned=True, abort=False, require_confirmation=False)):
         cli.hook_exec(mock_args)
     
     captured = capsys.readouterr()
@@ -75,7 +75,7 @@ def test_hook_exec_misaligned(capsys):
     mock_args.executable = "/path/to/pip"
     
     msg = "[WARNING] Mismatch!"
-    with patch("envguard.hook.check_alignment", return_value={"aligned": False, "message": msg}):
+    with patch("envguard.hook.check_alignment", return_value=MagicMock(aligned=False, abort=False, require_confirmation=False, message=msg)):
         cli.hook_exec(mock_args)
     
     captured = capsys.readouterr()
@@ -90,7 +90,7 @@ def test_hook_exec_require_confirmation_yes(mock_input, capsys):
     mock_args.args = ["install", "--break-system-packages"]
     
     msg = "[WARNING] You are using --break-system-packages interactively."
-    with patch("envguard.hook.check_alignment", return_value={"aligned": False, "require_confirmation": True, "message": msg}):
+    with patch("envguard.hook.check_alignment", return_value=MagicMock(aligned=False, abort=False, require_confirmation=True, message=msg)):
         cli.hook_exec(mock_args)
     
     captured = capsys.readouterr()
@@ -106,7 +106,7 @@ def test_hook_exec_require_confirmation_no(mock_input, capsys):
     mock_args.args = ["install", "--break-system-packages"]
     
     msg = "[WARNING] You are using --break-system-packages interactively."
-    with patch("envguard.hook.check_alignment", return_value={"aligned": False, "require_confirmation": True, "message": msg}):
+    with patch("envguard.hook.check_alignment", return_value=MagicMock(aligned=False, abort=False, require_confirmation=True, message=msg)):
         with pytest.raises(SystemExit) as excinfo:
             cli.hook_exec(mock_args)
         assert excinfo.value.code == 1
@@ -132,7 +132,7 @@ def test_doctor(capsys):
     with patch("envguard.engine.analyze_executable", return_value=mock_env_data), \
          patch("shutil.which", return_value="/path/to/pip"), \
          patch("subprocess.run", return_value=mock_subprocess_result), \
-         patch("envguard.hook.check_alignment", return_value={"aligned": True}):
+         patch("envguard.hook.check_alignment", return_value=MagicMock(aligned=True, abort=False, require_confirmation=False)):
         cli.doctor(mock_args)
         
     captured = capsys.readouterr()

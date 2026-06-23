@@ -25,10 +25,10 @@ def test_check_alignment_complex_global_paths_in_venv(tmp_path, global_pip_path,
     # We do not physically create the global_pip_path, engine.py will analyze the string gracefully.
     with patch("sys.executable", str(venv_python)):
         result = hook.check_alignment(global_pip_path, "pip", active_python=str(venv_python))
-        assert result["aligned"] is False
-        assert "virtual environment" in result["message"]
+        assert result.aligned is False
+        assert "virtual environment" in result.message
         # The tool category should match our expectation
-        assert result["tool_category"] == expected_category
+        assert result.tool_category == expected_category
 
 def test_check_alignment_pip_aligned(tmp_path):
     # Mock environment: sys.executable is in venv, pip is also in the same venv
@@ -47,7 +47,7 @@ def test_check_alignment_pip_aligned(tmp_path):
     # When trying to run venv pip while venv is active
     with patch("sys.executable", str(venv_python)):
         result = hook.check_alignment(str(venv_pip), "pip")
-        assert result["aligned"] is True
+        assert result.aligned is True
 
 def test_check_alignment_python_m_pip(tmp_path):
     # Mock environment: sys.executable is in venv, and user runs `python3 -m pip`
@@ -65,7 +65,7 @@ def test_check_alignment_python_m_pip(tmp_path):
     # but if it did (or if we manually check alignment), it should be 100% aligned.
     with patch("sys.executable", str(venv_python)):
         result = hook.check_alignment(str(venv_python), "python3", active_python=str(venv_python))
-        assert result["aligned"] is True
+        assert result.aligned is True
 
 def test_check_alignment_pyinstaller_in_venv(tmp_path):
     # Mock environment: sys.executable is in venv, but pyinstaller is global
@@ -84,15 +84,14 @@ def test_check_alignment_pyinstaller_in_venv(tmp_path):
 
     with patch("sys.executable", str(venv_python)):
         result = hook.check_alignment(str(global_pyinstaller), "pyinstaller", active_python=str(venv_python))
-        assert result["aligned"] is False
-        assert "ModuleNotFoundError" in result["message"]
+        assert result.aligned is False
+        assert "ModuleNotFoundError" in result.message
 
 def test_silent_fail_on_exception():
     # Mock a scenario that raises an exception in the engine
     with patch("envguard.engine.analyze_executable", side_effect=Exception("Permission denied")):
         result = hook.check_alignment("/fake/path", "pip")
-        assert result["aligned"] is True  # Should pass silently
-        assert result.get("error") is not None
+        assert result.aligned is True  # Should pass silently
 
 def test_extract_python_version_from_path():
     assert hook.extract_python_version("/Library/Python/3.9/bin/pip") == "3.9"
@@ -117,12 +116,12 @@ def test_check_alignment_global_version_mismatch(tmp_path):
         
     with patch("envguard.engine.analyze_executable", side_effect=mock_analyze):
         result = hook.check_alignment(pip_path, "pip", active_python=python_path)
-        assert result["aligned"] is False
-        assert "Version Mismatch" in result["message"]
-        assert "3.12" in result["message"]
-        assert "3.9" in result["message"]
-        assert "[HINT]" in result["message"]
-        assert "$PATH" in result["message"]
+        assert result.aligned is False
+        assert "Version Mismatch" in result.message
+        assert "3.12" in result.message
+        assert "3.9" in result.message
+        assert "[HINT]" in result.message
+        assert "$PATH" in result.message
 
 def test_check_alignment_global_version_match(tmp_path):
     python_path = "/usr/local/bin/python3.10"
@@ -137,7 +136,7 @@ def test_check_alignment_global_version_match(tmp_path):
         
     with patch("envguard.engine.analyze_executable", side_effect=mock_analyze):
         result = hook.check_alignment(pip_path, "pip", active_python=python_path)
-        assert result["aligned"] is True
+        assert result.aligned is True
 
 @pytest.mark.parametrize("env_type", ["venv", "global"])
 @pytest.mark.parametrize("exec_style", ["pip", "python_m_pip"])
@@ -180,7 +179,7 @@ def test_pip_execution_permutations(tmp_path, env_type, exec_style):
         
     with patch("envguard.engine.analyze_executable", side_effect=mock_analyze):
         result = hook.check_alignment(executable_path, command, active_python=python_path)
-        assert result["aligned"] is True
+        assert result.aligned is True
 
 def test_check_alignment_symlink_abuse(tmp_path):
     # Case: Python is 3.12, but pip is a symlink pointing to 3.9
@@ -197,11 +196,11 @@ def test_check_alignment_symlink_abuse(tmp_path):
         
     with patch("envguard.engine.analyze_executable", side_effect=mock_analyze):
         result = hook.check_alignment(pip_symlink_path, "pip", active_python=python_path)
-        assert result["aligned"] is False
-        assert "Version Mismatch" in result["message"]
-        assert "3.12" in result["message"]
-        assert "3.9" in result["message"]
-        assert "[HINT]" in result["message"]
+        assert result.aligned is False
+        assert "Version Mismatch" in result.message
+        assert "3.12" in result.message
+        assert "3.9" in result.message
+        assert "[HINT]" in result.message
 
 def test_check_alignment_homebrew_vs_macports(tmp_path):
     # Case: Python is from Homebrew (3.10), Pip is from MacPorts (3.12)
@@ -217,11 +216,11 @@ def test_check_alignment_homebrew_vs_macports(tmp_path):
         
     with patch("envguard.engine.analyze_executable", side_effect=mock_analyze):
         result = hook.check_alignment(pip_path, "pip", active_python=python_path)
-        assert result["aligned"] is False
-        assert "Version Mismatch" in result["message"]
-        assert "3.10" in result["message"]
-        assert "3.12" in result["message"]
-        assert "[HINT]" in result["message"]
+        assert result.aligned is False
+        assert "Version Mismatch" in result.message
+        assert "3.10" in result.message
+        assert "3.12" in result.message
+        assert "[HINT]" in result.message
 
 def test_check_alignment_uv_bypass():
     mock_python_env = {"is_venv": True, "category": "venv", "real_path": "/venv/python"}
@@ -234,7 +233,7 @@ def test_check_alignment_uv_bypass():
     with patch("envguard.engine.analyze_executable", side_effect=mock_analyze), \
          patch("envguard.engine.get_active_python", return_value="/venv/python"):
         result = hook.check_alignment("/usr/bin/uv", "uv", active_python="/venv/python")
-        assert result["aligned"] is True
+        assert result.aligned is True
 
 def test_check_alignment_different_venvs():
     mock_python_env = {"is_venv": True, "category": "venv", "real_path": "/venv1/python", "venv_path": "/venv1"}
@@ -246,8 +245,8 @@ def test_check_alignment_different_venvs():
         
     with patch("envguard.engine.analyze_executable", side_effect=mock_analyze):
         result = hook.check_alignment("/venv2/pip", "pip", active_python="/venv1/python")
-        assert result["aligned"] is False
-        assert "Environment mismatch" in result["message"]
+        assert result.aligned is False
+        assert "Environment mismatch" in result.message
 
 def test_hook_main_execution(capsys, monkeypatch):
     import subprocess
