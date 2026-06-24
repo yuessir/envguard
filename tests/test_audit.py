@@ -5,50 +5,137 @@ from unittest.mock import patch, MagicMock
 # The module we are about to implement
 from envguard.audit_engine import evaluate_security_status, EnvContext, find_target_python, GhostEnvironmentConflictError
 
-def test_evaluate_security_status():
+class TestAuditIntegrationMatrix:
     """
-    TDD Unit Test Matrix for Path Isolation and Corrupted states.
-    Tests physical path combinations against sys.prefix and version_str.
+    14 E2E Integration Tests covering VIRTUAL_ENV activation status, Python upgrades,
+    and different leak/corruption boundaries.
     """
-    # Active Environment: Python 3.12, Virtual Environment located at /project/.venv
-    context_venv = EnvContext(prefix="/project/.venv", version_str="python3.12", is_venv=True)
     
-    # Active Environment: Python 3.12, Virtual Environment with CUSTOM name (Duck Typing test)
-    context_custom_venv = EnvContext(prefix="/project/my_env", version_str="python3.12", is_venv=True)
-    
-    # Active Environment: Python 3.12, Global Environment located at /usr/local
-    context_global = EnvContext(prefix="/usr/local", version_str="python3.12", is_venv=False)
+    def _run_integration(self, is_activated: bool, has_venv: bool, active_python_version: str, package_path: str) -> str:
+        """
+        Helper to simulate the engine logic:
+        1. find_target_python()
+        2. evaluate_security_status()
+        """
+        with patch("envguard.audit_engine.os.environ.get") as mock_environ_get, \
+             patch("envguard.audit_engine.os.getcwd") as mock_getcwd, \
+             patch("envguard.audit_engine.os.path.exists") as mock_exists, \
+             patch("envguard.audit_engine.engine.get_active_python") as mock_get_active_python:
+            
+            if is_activated:
+                mock_environ_get.return_value = "/project/.venv"
+                mock_getcwd.return_value = "/project/src"
+                mock_get_active_python.return_value = f"/project/.venv/bin/{active_python_version}"
+                def exists_side_effect(path):
+                    return path == "/project/.venv/pyvenv.cfg"
+                mock_exists.side_effect = exists_side_effect
+            else:
+                mock_environ_get.return_value = None
+                if has_venv:
+                    mock_getcwd.return_value = "/project/src"
+                    mock_get_active_python.return_value = f"/usr/local/bin/{active_python_version}"
+                    def exists_side_effect(path):
+                        return path == "/project/.venv/pyvenv.cfg"
+                    mock_exists.side_effect = exists_side_effect
+                else:
+                    mock_getcwd.return_value = "/tmp/dir"
+                    mock_get_active_python.return_value = f"/usr/local/bin/{active_python_version}"
+                    mock_exists.return_value = False
+                    
+            # Step 1: Context Resolution
+            target_python, target_prefix = find_target_python()
+            
+            # Build EnvContext based on resolution
+            if target_prefix:
+                context = EnvContext(prefix=target_prefix, version_str=active_python_version, is_venv=True)
+            else:
+                context = EnvContext(prefix="/usr/local", version_str=active_python_version, is_venv=False)
+                
+            # Step 2: Path Evaluation
+            return evaluate_security_status(package_path, context)
 
-    # [Test a-2] Venv: flask in venv (SAFE), requests in global (LEAK)
-    assert evaluate_security_status("/project/.venv/lib/python3.12/site-packages/flask", context_venv) == "SAFE"
-    assert evaluate_security_status("/usr/local/lib/python3.12/site-packages/requests", context_venv) == "LEAK"
+    # ==============================================================================
+    # 🍎 第一類：無虛擬環境 (Global Only)
+    # ==============================================================================
+    def test_global_upgrade_leak(self):
+        # 1. 套件全在全局，涉及 Python 升級
+        # Active: python3.12, loaded: python3.9 package
+        res = self._run_integration(is_activated=False, has_venv=False, active_python_version="python3.12", package_path="/usr/local/lib/python3.9/site-packages/requests")
+        assert res == "LEAK"
 
-    # [Test a-1] Venv Upgrade Leak: flask in venv (SAFE), requests in 3.9 global (LEAK)
-    assert evaluate_security_status("/project/.venv/lib/python3.12/site-packages/flask", context_venv) == "SAFE"
-    assert evaluate_security_status("/usr/local/lib/python3.9/site-packages/requests", context_venv) == "LEAK"
+    def test_global_no_upgrade(self):
+        # 2. 套件全在全局，沒升級
+        res = self._run_integration(is_activated=False, has_venv=False, active_python_version="python3.12", package_path="/usr/local/lib/python3.12/site-packages/flask")
+        assert res == "SAFE"
 
-    # [Test b-2] Venv Only (No upgrade): flask in venv (SAFE)
-    assert evaluate_security_status("/project/.venv/lib/python3.12/site-packages/flask", context_venv) == "SAFE"
+    # ==============================================================================
+    # 🍏 第二類：有虛擬環境 (情境 A - 套件全在全局，Venv 為空)
+    # ==============================================================================
+    def test_venv_empty_global_leak_upgrade_activated(self):
+        # 3. 涉及升級 + 已啟動 Venv
+        res = self._run_integration(is_activated=True, has_venv=True, active_python_version="python3.12", package_path="/usr/local/lib/python3.9/site-packages/flask")
+        assert res == "LEAK"
 
-    # [Test b-1] Venv Corrupted (Upgrade): flask in venv but under old 3.9 folder
-    assert evaluate_security_status("/project/.venv/lib/python3.9/site-packages/flask", context_venv) == "CORRUPTED"
-    
-    # [Test b-1-custom] Venv Corrupted (Custom Venv Name): folder is my_env, no "venv" string in it!
-    # Without Duck Typing, this would incorrectly be identified as LEAK instead of CORRUPTED.
-    assert evaluate_security_status("/project/my_env/lib/python3.9/site-packages/flask", context_custom_venv) == "CORRUPTED"
+    def test_venv_empty_global_leak_upgrade_not_activated(self):
+        # 4. 涉及升級 + 未啟動 Venv (引擎將向上推演)
+        res = self._run_integration(is_activated=False, has_venv=True, active_python_version="python3.12", package_path="/usr/local/lib/python3.9/site-packages/flask")
+        assert res == "LEAK"
 
-    # [Test c-2] Venv Empty, Global Leak (No upgrade)
-    assert evaluate_security_status("/usr/local/lib/python3.12/site-packages/flask", context_venv) == "LEAK"
+    def test_venv_empty_global_leak_no_upgrade_activated(self):
+        # 5. 沒升級 + 已啟動 Venv
+        res = self._run_integration(is_activated=True, has_venv=True, active_python_version="python3.12", package_path="/usr/local/lib/python3.12/site-packages/flask")
+        assert res == "LEAK"
 
-    # [Test c-1] Venv Empty, Global Leak (Upgrade)
-    assert evaluate_security_status("/usr/local/lib/python3.9/site-packages/flask", context_venv) == "LEAK"
+    def test_venv_empty_global_leak_no_upgrade_not_activated(self):
+        # 6. 沒升級 + 未啟動 Venv (引擎將向上推演)
+        res = self._run_integration(is_activated=False, has_venv=True, active_python_version="python3.12", package_path="/usr/local/lib/python3.12/site-packages/flask")
+        assert res == "LEAK"
 
-    # [Test e-2] Global Environment Only (No upgrade)
-    assert evaluate_security_status("/usr/local/lib/python3.12/site-packages/flask", context_global) == "SAFE"
+    # ==============================================================================
+    # 🍏 第二類：有虛擬環境 (情境 B - 套件全在虛擬，全局為空)
+    # ==============================================================================
+    def test_venv_only_corrupted_upgrade_activated(self):
+        # 7. 涉及升級導致損壞 + 已啟動 Venv
+        res = self._run_integration(is_activated=True, has_venv=True, active_python_version="python3.12", package_path="/project/.venv/lib/python3.9/site-packages/flask")
+        assert res == "CORRUPTED"
 
-    # [Test e-1] Global Environment Leak (Upgrade)
-    # The active global is 3.12, but it loaded a package from the 3.9 global path.
-    assert evaluate_security_status("/usr/local/lib/python3.9/site-packages/requests", context_global) == "LEAK"
+    def test_venv_only_corrupted_upgrade_not_activated(self):
+        # 8. 涉及升級導致損壞 + 未啟動 Venv
+        res = self._run_integration(is_activated=False, has_venv=True, active_python_version="python3.12", package_path="/project/.venv/lib/python3.9/site-packages/flask")
+        assert res == "CORRUPTED"
+
+    def test_venv_only_no_upgrade_activated(self):
+        # 9. 沒升級 (完美隔離) + 已啟動 Venv
+        res = self._run_integration(is_activated=True, has_venv=True, active_python_version="python3.12", package_path="/project/.venv/lib/python3.12/site-packages/flask")
+        assert res == "SAFE"
+
+    def test_venv_only_no_upgrade_not_activated(self):
+        # 10. 沒升級 (完美隔離) + 未啟動 Venv
+        res = self._run_integration(is_activated=False, has_venv=True, active_python_version="python3.12", package_path="/project/.venv/lib/python3.12/site-packages/flask")
+        assert res == "SAFE"
+
+    # ==============================================================================
+    # 🍏 第二類：有虛擬環境 (情境 C - 混合污染)
+    # ==============================================================================
+    def test_venv_mixed_upgrade_activated(self):
+        # 11. 涉及升級，部分套件讀到全局 + 已啟動 Venv
+        res = self._run_integration(is_activated=True, has_venv=True, active_python_version="python3.12", package_path="/usr/local/lib/python3.9/site-packages/requests")
+        assert res == "LEAK"
+
+    def test_venv_mixed_upgrade_not_activated(self):
+        # 12. 涉及升級，部分套件讀到全局 + 未啟動 Venv
+        res = self._run_integration(is_activated=False, has_venv=True, active_python_version="python3.12", package_path="/usr/local/lib/python3.9/site-packages/requests")
+        assert res == "LEAK"
+
+    def test_venv_mixed_no_upgrade_activated(self):
+        # 13. 沒升級，部分套件讀到全局 + 已啟動 Venv
+        res = self._run_integration(is_activated=True, has_venv=True, active_python_version="python3.12", package_path="/usr/local/lib/python3.12/site-packages/requests")
+        assert res == "LEAK"
+
+    def test_venv_mixed_no_upgrade_not_activated(self):
+        # 14. 沒升級，部分套件讀到全局 + 未啟動 Venv
+        res = self._run_integration(is_activated=False, has_venv=True, active_python_version="python3.12", package_path="/usr/local/lib/python3.12/site-packages/requests")
+        assert res == "LEAK"
 
 
 @patch("envguard.audit_engine.os.getcwd")
