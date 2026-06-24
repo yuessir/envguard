@@ -52,8 +52,15 @@ You can customize this JSON file to add any command-line tool you want EnvGuard 
 ### Advanced Rules (`rules.json`)
 EnvGuard relies on an internal `rules.json` file for advanced heuristics, such as defining `ghost_whitelist` (to ignore safe metadata-less modules like `sitecustomize` or `__pycache__`) and defining `blacklist_directories` for searching. You can customize this file inside the source code if you need to bypass specific ghost module false positives.
 
-## Usage & Examples
+## Platform Support
 
+EnvGuard's core logic is built on Unix/POSIX standards, ensuring excellent cross-platform stability:
+
+- **macOS (Intel & Apple Silicon):** ✅ Fully Supported. Supports Zsh interception and is compatible with Homebrew (`/usr/local` or `/opt/homebrew`) and MacPorts.
+- **Linux (Ubuntu, Debian, CentOS, etc.):** ✅ Fully Supported. Supports Bash/Zsh interception and accurately resolves `pyenv` shims.
+- **Windows:** ⚠️ Partially Supported (WIP). Proactive diagnostic commands like `envguard doctor` and `envguard audit` run normally, but passive interception (Shell Hooks) for PowerShell / CMD is not yet supported. For a complete experience on Windows, using WSL2 is highly recommended.
+
+## Usage & Examples
 Once initialized, EnvGuard runs silently in the background. It will only interrupt you when it detects a critical environment misalignment.
 
 ### 1. Active Diagnostics (`envguard doctor`)
