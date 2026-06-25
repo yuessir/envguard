@@ -101,11 +101,11 @@ def doctor(args):
             tool_path = shutil.which(tool)
             if tool_path:
                 res = hook.check_alignment(tool_path, tool, active_python=current_python)
-                status = f"{Colors.GREEN}ALIGNED{Colors.RESET}" if res.get("aligned") else f"{Colors.RED}MISALIGNED{Colors.RESET}"
-                category_label = res.get("tool_category", "unknown")
+                status = f"{Colors.GREEN}ALIGNED{Colors.RESET}" if res.aligned else f"{Colors.RED}MISALIGNED{Colors.RESET}"
+                category_label = res.tool_category
                 print(f"- {tool} ({category_label}): {tool_path} [{status}]")
-                if not res.get("aligned"):
-                    print_warning(f"  -> {res.get('message').replace(chr(10), chr(10)+'  -> ')}")
+                if not res.aligned:
+                    print_warning(f"  -> {res.message.replace(chr(10), chr(10)+'  -> ')}")
             else:
                 print(f"- {tool}: Not installed in PATH")
     except Exception as e:
