@@ -177,6 +177,10 @@ EnvGuard will classify each package into one of five states:
 > Both indicate a misalignment, but they happen at different levels:
 > - **`[CORRUPTED]` (Internal Package Corruption)**: Happens in `site-packages/`. The package contains compiled C/C++ engine files (like `.so`) built for the wrong python version. Symptom: Triggers `ImportError` or `Segmentation Fault` when you `import` the package.
 > - **`[BAD WRAPPER]` (External Script Corruption)**: Happens in `bin/`. The executable script itself has a Shebang (`#!/path/to/python`) pointing to the wrong python environment. Symptom: Triggers `ModuleNotFoundError` when you run the command in the terminal because it starts with the wrong Python engine.
+> 
+> **Example Comparison:**
+> - 🟢 **`[SAFE]`**: Script `/venv/bin/pip` has Shebang `#!/venv/bin/python` (points inward to its own environment).
+> - 🔴 **`[BAD WRAPPER]`**: Script `/venv/bin/pip` has Shebang `#!/usr/bin/python` (points outward to an external system environment).
 
 ## Debugging
 

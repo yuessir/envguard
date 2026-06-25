@@ -177,6 +177,10 @@ EnvGuard 会将每个软件包分类为五种状态之一：
 > 两者皆为环境错位，但发生在不同层面：
 > - **`[CORRUPTED]` (内部软件包内容错位)**：发生在 `site-packages/`。软件包内包含了编译错误的 C/C++ 引擎 (如 `.so`)。症状：执行 `import` 时发生 `ImportError` 或 `Segmentation Fault`。
 > - **`[BAD WRAPPER]` (外部可执行文件垫片错位)**：发生在 `bin/`。可执行文件本身的 Shebang (`#!/path/to/python`) 指向错误的环境。症状：在终端输入指令时，由于使用错误的 Python 引擎启动，导致发生 `ModuleNotFoundError`。
+> 
+> **示例对比：**
+> - 🟢 **`[SAFE]`**: 脚本 `/venv/bin/pip`，其 Shebang 指向 `#!/venv/bin/python` (向内指向同一环境)。
+> - 🔴 **`[BAD WRAPPER]`**: 脚本 `/venv/bin/pip`，其 Shebang 却指向 `#!/usr/bin/python` (向外指向外部环境)。
 
 ## 调试 (Debugging)
 
