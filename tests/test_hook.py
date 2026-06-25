@@ -96,7 +96,7 @@ def test_silent_fail_on_exception():
 def test_extract_python_version_from_path():
     assert hook.extract_python_version("/Library/Python/3.9/bin/pip") == ("3.9", None)
     assert hook.extract_python_version("/opt/local/Library/Frameworks/Python.framework/Versions/3.12/bin/python3.12") == ("3.12", None)
-    assert hook.extract_python_version("/usr/bin/pip3") == (None, None)
+    assert hook.extract_python_version("/fake/usr/bin/pip3") == (None, None)
 
 def test_extract_python_version_from_shebang(tmp_path):
     dummy_script = tmp_path / "pip"
