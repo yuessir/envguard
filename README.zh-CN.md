@@ -105,6 +105,15 @@ Your terminal found 'pip' in a directory that has higher priority in your $PATH:
 2. Permanent fix: Clean up your $PATH configuration (e.g., in ~/.zshrc) to ensure your v3.12 bin folder appears before other versions.
 ```
 
+**AB 车错位警告 (Wrapper Integrity Check):**
+除了检查外部执行的 Python 版本，EnvGuard 也会深度检查“可执行文件垫片 (Wrapper Script)”。如果它发现您执行的指令（例如 `jupyter`）所在文件夹的版本，与它内部 Shebang (`#!/path/to/python`) 真正调用的版本不一致时，会提出“结构异常”警告。这能有效防止您在 A 环境执行指令，却把软件包装到 B 环境的诡异现象。
+
+> [!NOTE]
+> **Hook 的拦截极限与生命周期**
+> 1. **拦截极限**：EnvGuard 的动态 Hook 是通过 Zsh/Bash 的 `function` 实现。因此，它**只能拦截纯指令** (例如输入 `jupyter`)。如果您输入的是相对/绝对路径 (例如 `./jupyter` 或 `/bin/jupyter`)，Shell 会强制绕过 Function 直接执行物理文件，此时 Hook **不会**被触发。
+> 2. **生命周期**：当终端开启时，EnvGuard 会根据名单 (默认为 `~/.envguard/tools.cache`) 绑定拦截函数。如果您修改了 `rules.json` 以新增或移除监听工具，当下的终端并不会立刻知道！您必须执行 `envguard init` 重新热重载 (Hot-reload)，拦截网才会根据新名单更新。
+
+
 ### 3. 模块雷达 (`envguard find`)
 您是否曾经遇过明明执行过 `pip install`，却还是出现 `ModuleNotFoundError`？EnvGuard 提供强大的 3 层搜索引擎，可扫描您的本地工作区、活动中的虚拟环境，以及所有已知的系统全局环境（由 `rules.json` 驱动）。
 
@@ -145,15 +154,23 @@ envguard audit
 # 显示为表格格式
 envguard audit --format table
 
+# 深度扫描损坏的垫片脚本 (Shebang 错位)
+envguard audit --scan-wrappers
+
 # 显示详细警告 (可查看底层的权限或探针错误)
 envguard audit --verbose
 ```
 
-EnvGuard 会将每个软件包分类为四种状态之一：
+> [!TIP]
+> **为什么需要静态扫描 `--scan-wrappers`？**
+> 如同前述，动态 Hook 无法拦截带有路径的指令 (如 `./jupyter`)。这时您可以利用 `--scan-wrappers` 进行全局的静态健检。它会逐一读取环境中 `bin/` 目录下的所有二进制垫片，揪出任何指向外部环境的 **[BAD WRAPPER]**！
+
+EnvGuard 会将每个软件包分类为五种状态之一：
 - `[SAFE]`: 安装正确且隔离良好。
 - `[LEAK]`: 从未授权的外部环境拉取 (例如：虚拟环境偷偷加载了全局的 site-packages)。
 - `[CORRUPTED]`: Python 版本与软件包内容发生内部错位 (例如：Python 3.12 加载了 Python 3.11 的 `.so` 可执行文件)。
 - `[GHOST]`: “幽灵模块”。实体文件存在于 `site-packages` 中，但没有任何 metadata (`top_level.txt` 或 `RECORD`) 追踪它们。这通常发生在 OS 包管理器 (如 `apt` 或 `macports`) 强制植入软件包时，并会导致 `pip freeze` 遗漏这些依赖。
+- `[BAD WRAPPER]`: 损坏的可执行文件垫片。脚本内部的 Shebang 指向了外部非预期的 Python 环境 (仅在执行 `--scan-wrappers` 时扫描)。
 
 ## 调试 (Debugging)
 

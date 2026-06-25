@@ -164,11 +164,12 @@ envguard audit --verbose
 > **為什麼需要靜態掃描 `--scan-wrappers`？**
 > 如同前述，動態 Hook 無法攔截帶有路徑的指令 (如 `./jupyter`)。這時您可以利用 `--scan-wrappers` 進行全域的靜態健檢。它會逐一讀取環境中 `bin/` 目錄下的所有二進位墊片，揪出任何指向外部環境的 **[BAD WRAPPER]**！
 
-EnvGuard 會將每個套件分類為四種狀態之一：
+EnvGuard 會將每個套件分類為五種狀態之一：
 - `[SAFE]`: 安裝正確且隔離良好。
 - `[LEAK]`: 從未授權的外部環境拉取 (例如：虛擬環境偷偷載入了全域的 site-packages)。
 - `[CORRUPTED]`: Python 版本與套件內容發生內部錯位 (例如：Python 3.12 載入了 Python 3.11 的 `.so` 執行檔)。
 - `[GHOST]`: 「幽靈模組」。實體檔案存在於 `site-packages` 中，但沒有任何 metadata (`top_level.txt` 或 `RECORD`) 追蹤它們。這通常發生在 OS 套件管理器 (如 `apt` 或 `macports`) 強制植入套件時，並會導致 `pip freeze` 遺漏這些依賴。
+- `[BAD WRAPPER]`: 損壞的執行檔墊片。腳本內部的 Shebang 指向了外部非預期的 Python 環境 (僅在執行 `--scan-wrappers` 時掃描)。
 
 ## 除錯 (Debugging)
 

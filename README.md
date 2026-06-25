@@ -165,11 +165,12 @@ envguard audit --verbose
 > **Why do we need static scanning with `--scan-wrappers`?**
 > As mentioned above, dynamic Hooks cannot intercept commands executed with explicit paths (like `./jupyter`). This is where `--scan-wrappers` shines. It performs a comprehensive static check of all binary wrappers in your `bin/` directory, surfacing any **[BAD WRAPPER]** that points outside your active environment!
 
-EnvGuard will classify each package into one of four states:
+EnvGuard will classify each package into one of five states:
 - `[SAFE]`: Properly installed and isolated.
 - `[LEAK]`: Pulled from an unauthorized external environment (e.g., a virtualenv secretly loading global site-packages).
 - `[CORRUPTED]`: Internal mismatch between python version and package contents (e.g., Python 3.12 loading Python 3.11 `.so` binaries).
 - `[GHOST]`: "Phantom Modules". The physical files exist in `site-packages`, but there is no metadata (`top_level.txt` or `RECORD`) tracking them. This often happens when packages are forcibly injected by OS package managers (like `apt` or `macports`) and will cause `pip freeze` to miss them.
+- `[BAD WRAPPER]`: Corrupted wrapper scripts. The internal Shebang points to an unexpected external Python environment (only scanned when using `--scan-wrappers`).
 
 ## Debugging
 
