@@ -174,19 +174,19 @@ def test_doctor_mixed_alignment_permutations(capsys, pip_loc, pip3_loc):
     def mock_check_alignment(tool_path, command, active_python=None):
         if command == "pip":
             aligned = (pip_loc == "venv")
-            return {
-                "aligned": aligned, 
-                "tool_category": "venv" if aligned else "system", 
-                "message": "" if aligned else "Global pip detected"
-            }
+            return MagicMock(
+                aligned=aligned, 
+                tool_category="venv" if aligned else "system", 
+                message="" if aligned else "Global pip detected"
+            )
         elif command == "pip3":
             aligned = (pip3_loc == "venv")
-            return {
-                "aligned": aligned, 
-                "tool_category": "venv" if aligned else "system", 
-                "message": "" if aligned else "Global pip3 detected"
-            }
-        return {"aligned": True, "tool_category": "unknown", "message": ""}
+            return MagicMock(
+                aligned=aligned, 
+                tool_category="venv" if aligned else "system", 
+                message="" if aligned else "Global pip3 detected"
+            )
+        return MagicMock(aligned=True, tool_category="unknown", message="")
         
     with patch("envguard.engine.analyze_executable", return_value=mock_env_data), \
          patch("shutil.which", side_effect=mock_which), \
