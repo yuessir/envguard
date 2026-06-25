@@ -127,7 +127,7 @@ def test_hook_consistency_warning(tmp_path):
         
         assert result.aligned is True
         mock_warning.assert_called_once()
-        assert "結構異常" in mock_warning.call_args[0][0]
+        assert "Structural Anomaly" in mock_warning.call_args[0][0]
 
 def test_check_alignment_global_version_mismatch(tmp_path):
     python_path = "/usr/local/bin/python3.12"
