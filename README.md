@@ -105,6 +105,15 @@ Your terminal found 'pip' in a directory that has higher priority in your $PATH:
 2. Permanent fix: Clean up your $PATH configuration (e.g., in ~/.zshrc) to ensure your v3.12 bin folder appears before other versions.
 ```
 
+**Wrapper Integrity Check (Shebang Mismatch):**
+In addition to checking the external Python environment, EnvGuard deeply inspects wrapper scripts. If you run a command (e.g., `jupyter`), and EnvGuard detects that the script's internal Shebang (`#!/path/to/python`) points to a different Python version than its folder path, it emits a structural inconsistency warning. This prevents scenarios where you run a command from Environment A but accidentally install packages into Environment B.
+
+> [!NOTE]
+> **Hook Bypass Limitations & Lifecycle**
+> 1. **Bypass Limitations**: EnvGuard's dynamic Hooks are implemented using Zsh/Bash `function`s. Therefore, they **only intercept bare commands** (e.g., typing `jupyter`). If you use a relative or absolute path (e.g., `./jupyter` or `/bin/jupyter`), the Shell forces direct execution of the binary, bypassing the function entirely. In this case, the Hook will **not** trigger.
+> 2. **Lifecycle**: EnvGuard binds hook functions when the terminal starts, based on the managed tools list (defaulting to `~/.envguard/tools.cache`). If you modify `rules.json` to add or remove tools, currently open terminals will not automatically know! You must run `envguard init` to hot-reload the current terminal so the interception net is rebuilt.
+
+
 ### 3. Module Radar (`envguard find`)
 Have you ever seen a `ModuleNotFoundError` despite being sure you ran `pip install` earlier? EnvGuard provides a powerful 3-tier search engine to scan your Local Workspace, Active Virtual Environment, and all known System Global Environments (driven by `rules.json`).
 
@@ -145,9 +154,16 @@ envguard audit
 # Run with table format
 envguard audit --format table
 
+# Deep scan for corrupted wrapper scripts (Shebang Mismatches)
+envguard audit --scan-wrappers
+
 # Run with verbose warnings (to see underlying permission/probe errors)
 envguard audit --verbose
 ```
+
+> [!TIP]
+> **Why do we need static scanning with `--scan-wrappers`?**
+> As mentioned above, dynamic Hooks cannot intercept commands executed with explicit paths (like `./jupyter`). This is where `--scan-wrappers` shines. It performs a comprehensive static check of all binary wrappers in your `bin/` directory, surfacing any **[BAD WRAPPER]** that points outside your active environment!
 
 EnvGuard will classify each package into one of four states:
 - `[SAFE]`: Properly installed and isolated.

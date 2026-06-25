@@ -124,7 +124,8 @@ def audit(args):
         sys.exit(1)
         
     try:
-        data = audit_engine.run_audit_probe(target_python)
+        scan_wrappers = getattr(args, "scan_wrappers", False)
+        data = audit_engine.run_audit_probe(target_python, scan_wrappers=scan_wrappers)
     except Exception as e:
         print(f"{Colors.RED}Probe execution failed: {e}{Colors.RESET}", file=sys.stderr)
         sys.exit(1)
@@ -139,6 +140,7 @@ def audit(args):
     safe_pkgs = []
     leak_pkgs = []
     corrupted_pkgs = []
+    bad_wrappers = []
     
     for pkg in data["packages"]:
         status = audit_engine.evaluate_security_status(pkg["path"], context)
@@ -161,6 +163,17 @@ def audit(args):
         elif status == "CORRUPTED":
             corrupted_pkgs.append(pkg_data)
             
+    # Process wrappers if scanned
+    for wrap in data.get("wrappers", []):
+        w_status = audit_engine.evaluate_wrapper_status(wrap, context)
+        if w_status == "CORRUPTED_WRAPPER":
+            bad_wrappers.append({
+                "name": wrap["name"],
+                "version": "-",
+                "path": wrap["path"],
+                "source": f"指向外部: {wrap['shebang_path']}"
+            })
+            
     ghost_pkgs = data.get("ghosts", [])
     
     # Sort lists alphabetically by package name (case-insensitive)
@@ -168,17 +181,18 @@ def audit(args):
     leak_pkgs.sort(key=lambda x: x["name"].lower())
     corrupted_pkgs.sort(key=lambda x: x["name"].lower())
     ghost_pkgs.sort(key=lambda x: x["name"].lower())
+    bad_wrappers.sort(key=lambda x: x["name"].lower())
             
-    is_safe_overall = len(leak_pkgs) == 0 and len(corrupted_pkgs) == 0 and len(ghost_pkgs) == 0
+    is_safe_overall = len(leak_pkgs) == 0 and len(corrupted_pkgs) == 0 and len(ghost_pkgs) == 0 and len(bad_wrappers) == 0
     
     if args.format == "table":
-        all_pkgs = safe_pkgs + leak_pkgs + corrupted_pkgs + ghost_pkgs
+        all_pkgs = safe_pkgs + leak_pkgs + corrupted_pkgs + ghost_pkgs + bad_wrappers
         max_pkg = max([len(p['name']) for p in all_pkgs] + [7]) if all_pkgs else 7
         max_ver = max([len(str(p['version'])) for p in all_pkgs] + [7]) if all_pkgs else 7
         max_path = max([len(p['path']) for p in all_pkgs] + [9]) if all_pkgs else 9
         
-        header_len = 13 + max_pkg + max_ver + max_path + 20 + 4
-        print(f"{'STATUS':<13} {str('PACKAGE').ljust(max_pkg)} {str('VERSION').ljust(max_ver)} {str('REAL PATH').ljust(max_path)} SOURCE")
+        header_len = 13 + max_pkg + max_ver + max_path + 25 + 4
+        print(f"{'STATUS':<13} {str('PACKAGE').ljust(max_pkg)} {str('VERSION').ljust(max_ver)} {str('REAL PATH').ljust(max_path)} SOURCE / NOTES")
         print("─" * min(header_len, 120))
         
         for p in safe_pkgs:
@@ -189,12 +203,14 @@ def audit(args):
             print(f"{Colors.RED}{'[CORRUPTED]':<13}{Colors.RESET} {p['name'].ljust(max_pkg)} {str(p['version']).ljust(max_ver)} {p['path'].ljust(max_path)} {p['source']}")
         for p in ghost_pkgs:
             print(f"{Colors.PURPLE}{'[GHOST]':<13}{Colors.RESET} {p['name'].ljust(max_pkg)} {str(p['version']).ljust(max_ver)} {p['path'].ljust(max_path)} No Metadata")
+        for p in bad_wrappers:
+            print(f"{Colors.RED}{'[BAD WRAPPER]':<13}{Colors.RESET} {p['name'].ljust(max_pkg)} {str(p['version']).ljust(max_ver)} {p['path'].ljust(max_path)} {p['source']}")
             
         print("─" * min(header_len, 120))
         if is_safe_overall:
             print("✅ Audit Conclusion: All packages are safely isolated.")
         else:
-            total_issues = len(leak_pkgs) + len(corrupted_pkgs) + len(ghost_pkgs)
+            total_issues = len(leak_pkgs) + len(corrupted_pkgs) + len(ghost_pkgs) + len(bad_wrappers)
             print(f"🔥 Audit Conclusion: Found {total_issues} environment inconsistencies. This may cause project recreation to fail on other machines!")
     else:
         # Categorized view
@@ -236,6 +252,15 @@ def audit(args):
                 print(f"  📦 {p['name']} ({p['version']})")
                 print(f"     ├── Real Path: {p['path']}")
                 print(f"     └── Diagnosis: 💥 Version mismatch! Current environment is {data['version_str']}, but legacy packages were found. Consider rebuilding the virtualenv.")
+                print()
+                
+        if bad_wrappers:
+            print(f"{Colors.RED}💥 Corrupted Binaries (Shebang Mismatch){Colors.RESET}")
+            print("-" * 60)
+            for p in bad_wrappers:
+                print(f"  🛠️  {p['name']}")
+                print(f"     ├── Executable: {p['path']}")
+                print(f"     └── Diagnosis: {p['source']}. 建議重新安裝此工具或重建虛擬環境。")
                 print()
 
     # Common Warnings Section (Always printed at the very end if --verbose is True)
@@ -390,6 +415,7 @@ Package Types Explained:
     parser_find.set_defaults(func=find)
     
     audit_parser = subparsers.add_parser("audit", help="Check runtime environment isolation status")
+    audit_parser.add_argument("--scan-wrappers", action="store_true", help="Deep scan bin/ directory for corrupted wrappers (Shebang Mismatches)")
     audit_parser.add_argument("--format", choices=["categorized", "table"], default="categorized", help="Output format")
     audit_parser.add_argument("--verbose", action="store_true", help="Print underlying probe warnings")
     audit_parser.set_defaults(func=audit)

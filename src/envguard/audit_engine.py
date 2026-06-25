@@ -34,6 +34,36 @@ def evaluate_security_status(pkg_path: str, context: EnvContext) -> str:
     # Guard 3: Everything matches -> SAFE
     return "SAFE"
 
+def evaluate_wrapper_status(wrapper_info: dict, context: EnvContext) -> str:
+    """
+    Evaluates if an executable wrapper (like pip or jupyter) in the bin/ directory
+    has a corrupted shebang pointing outside of the expected environment.
+    """
+    shebang_path = wrapper_info.get("shebang_path", "")
+    if not shebang_path:
+        return "SAFE"
+        
+    # If the shebang uses 'python' directly (e.g. via /usr/bin/env), it relies on $PATH.
+    if shebang_path == "python" or shebang_path.startswith("python3"):
+        return "SAFE"
+        
+    # Resolve the absolute path of the shebang executable
+    if os.path.isabs(shebang_path):
+        # FAST PATH: If the shebang literal string already points inside the prefix, it's safe.
+        # This prevents false positives in venvs where .venv/bin/python is a symlink to the global python.
+        if shebang_path.startswith(context.prefix):
+            return "SAFE"
+            
+        try:
+            real_shebang = os.path.realpath(shebang_path)
+            # If the shebang's real path is outside the context prefix, it's corrupted.
+            if not real_shebang.startswith(context.prefix):
+                return "CORRUPTED_WRAPPER"
+        except Exception:
+            pass
+            
+    return "SAFE"
+
 def find_target_python():
     """
     Finds the python executable and prefix to audit.
@@ -85,7 +115,7 @@ def find_target_python():
     debug(f"[Audit] No venv found, falling back to active python: {fallback_python}")
     return fallback_python, None
 
-def run_audit_probe(python_exe: str):
+def run_audit_probe(python_exe: str, scan_wrappers: bool = False):
     """
     Runs the audit probe using subprocess to get package distributions, sys.prefix,
     and detects GHOST dependencies (no metadata).
@@ -97,7 +127,8 @@ def run_audit_probe(python_exe: str):
     probe_path = os.path.join(os.path.dirname(__file__), "probes", "audit.py")
     
     config_payload = json.dumps({
-        "ghost_whitelist": ghost_whitelist
+        "ghost_whitelist": ghost_whitelist,
+        "scan_wrappers": scan_wrappers
     })
 
     try:

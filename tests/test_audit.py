@@ -250,3 +250,27 @@ def test_ghost_module_detection_probe():
                 os.environ["PYTHONPATH"] = original_pythonpath
             else:
                 del os.environ["PYTHONPATH"]
+
+def test_evaluate_wrapper_status_false_positives():
+    from envguard.audit_engine import evaluate_wrapper_status, EnvContext
+    
+    context = EnvContext(prefix="/Users/test/.venv", version_str="3.12", is_venv=True)
+    # The shebang matches the prefix literally, even if realpath resolves outside
+    wrapper_info = {
+        "shebang_path": "/Users/test/.venv/bin/python3.12"
+    }
+    
+    assert evaluate_wrapper_status(wrapper_info, context) == "SAFE"
+
+def test_evaluate_wrapper_status_corrupted():
+    from envguard.audit_engine import evaluate_wrapper_status, EnvContext
+    from unittest.mock import patch
+    
+    context = EnvContext(prefix="/Users/test/Python/3.13", version_str="3.13", is_venv=False)
+    # The shebang points strictly outside
+    wrapper_info = {
+        "shebang_path": "/opt/local/bin/python3"
+    }
+    
+    with patch("os.path.realpath", return_value="/opt/local/bin/python3.12"):
+        assert evaluate_wrapper_status(wrapper_info, context) == "CORRUPTED_WRAPPER"

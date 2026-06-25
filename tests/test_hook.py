@@ -94,14 +94,40 @@ def test_silent_fail_on_exception():
         assert result.aligned is True  # Should pass silently
 
 def test_extract_python_version_from_path():
-    assert hook.extract_python_version("/Library/Python/3.9/bin/pip") == "3.9"
-    assert hook.extract_python_version("/opt/local/Library/Frameworks/Python.framework/Versions/3.12/bin/python3.12") == "3.12"
-    assert hook.extract_python_version("/usr/bin/pip3") is None
+    assert hook.extract_python_version("/Library/Python/3.9/bin/pip") == ("3.9", None)
+    assert hook.extract_python_version("/opt/local/Library/Frameworks/Python.framework/Versions/3.12/bin/python3.12") == ("3.12", None)
+    assert hook.extract_python_version("/usr/bin/pip3") == (None, None)
 
 def test_extract_python_version_from_shebang(tmp_path):
     dummy_script = tmp_path / "pip"
     dummy_script.write_text("#!/usr/local/bin/python3.10\nimport sys\n")
-    assert hook.extract_python_version(str(dummy_script)) == "3.10"
+    assert hook.extract_python_version(str(dummy_script)) == (None, "3.10")
+
+def test_extract_python_version_dual_output(tmp_path):
+    # Path has 3.13, Shebang points to a script resolving to 3.12
+    dummy_script = tmp_path / "3.13" / "bin" / "jupyter"
+    dummy_script.parent.mkdir(parents=True)
+    dummy_script.write_text("#!/opt/local/bin/python3\n")
+    
+    with patch("os.path.realpath", return_value="/opt/local/bin/python3.12"):
+        assert hook.extract_python_version(str(dummy_script)) == ("3.13", "3.12")
+
+def test_hook_consistency_warning(tmp_path):
+    python_path = "/opt/local/bin/python3.12"
+    tool_path = str(tmp_path / "3.13" / "bin" / "jupyter")
+    
+    with patch("envguard.hook.extract_python_version", return_value=("3.13", "3.12")), \
+         patch("envguard.engine.analyze_executable") as mock_analyze, \
+         patch("envguard.hook.logger.warning") as mock_warning:
+        
+        mock_analyze.side_effect = lambda p: {"real_path": p, "is_venv": False, "category": "user_site_env"}
+        envguard_env = {"python_exe": python_path, "version_str": "3.12"}
+        
+        result = hook.check_alignment(tool_path, "jupyter", active_python=python_path)
+        
+        assert result.aligned is True
+        mock_warning.assert_called_once()
+        assert "結構異常" in mock_warning.call_args[0][0]
 
 def test_check_alignment_global_version_mismatch(tmp_path):
     python_path = "/usr/local/bin/python3.12"

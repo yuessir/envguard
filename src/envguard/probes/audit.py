@@ -117,12 +117,38 @@ def main():
         except Exception as e:
             warnings_list.append(f"Ghost scan failed on dir {sd}: {e}")
 
+    # 3. Bin Wrappers Scan
+    wrappers = []
+    if config.get("scan_wrappers"):
+        bin_dir = os.path.join(sys.prefix, "bin")
+        if os.path.isdir(bin_dir):
+            try:
+                for item in os.listdir(bin_dir):
+                    item_path = os.path.join(bin_dir, item)
+                    if os.path.isfile(item_path) and os.access(item_path, os.X_OK) and not os.path.islink(item_path):
+                        # Attempt to read shebang
+                        try:
+                            with open(item_path, 'r') as f:
+                                first_line = f.readline().strip()
+                                if first_line.startswith("#!"):
+                                    shebang = first_line[2:].strip().split()[0]
+                                    wrappers.append({
+                                        "name": item,
+                                        "path": item_path,
+                                        "shebang_path": shebang
+                                    })
+                        except Exception:
+                            pass
+            except Exception as e:
+                warnings_list.append(f"Wrapper scan failed on dir {bin_dir}: {e}")
+
     result = {
         "prefix": sys.prefix,
         "version_str": f"python{sys.version_info.major}.{sys.version_info.minor}",
         "is_venv": sys.prefix != getattr(sys, "base_prefix", sys.prefix),
         "packages": packages,
         "ghosts": ghosts,
+        "wrappers": wrappers,
         "warnings": warnings_list
     }
     print(json.dumps(result))

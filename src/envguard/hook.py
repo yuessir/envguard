@@ -13,7 +13,12 @@ class AlignmentResult:
     tool_category: str = "unknown"
 
 def extract_python_version(file_path: str):
-    """Extract python version from path string, shebang, or by executing it."""
+    """
+    Extract python version from path string and shebang.
+    Returns: (path_version, shebang_version)
+    """
+    path_version = None
+    shebang_version = None
     
     # 1. Try executing it directly if it is a python interpreter
     basename = os.path.basename(file_path)
@@ -22,36 +27,43 @@ def extract_python_version(file_path: str):
             import subprocess
             res = subprocess.run([file_path, "-c", "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"], capture_output=True, text=True, timeout=1)
             if res.returncode == 0:
-                version = res.stdout.strip()
-                logger.debug(f"Extracted version v{version} by executing python: {file_path}")
-                return version
+                path_version = res.stdout.strip()
+                logger.debug(f"Extracted version v{path_version} by executing python: {file_path}")
         except Exception as e:
             logger.debug(f"Failed to execute python for version {file_path}: {e}")
-            pass
 
-    # 2. Extract from path string
-    version_match = re.search(r'(3\.\d+)', file_path)
-    if version_match:
-        version = version_match.group(1)
-        logger.debug(f"Extracted version v{version} from path string: {file_path}")
-        return version
+    # 2. Extract from path string (if not already found by execution)
+    if not path_version:
+        version_match = re.search(r'(3\.\d+)', file_path)
+        if version_match:
+            path_version = version_match.group(1)
+            logger.debug(f"Extracted path_version v{path_version} from path string: {file_path}")
     
     # 3. Try reading shebang
     try:
         with open(file_path, 'r') as f:
-            first_line = f.readline()
+            first_line = f.readline().strip()
             if first_line.startswith('#!'):
-                version_match = re.search(r'(3\.\d+)', first_line)
-                if version_match:
-                    version = version_match.group(1)
-                    logger.debug(f"Extracted version v{version} from shebang in: {file_path}")
-                    return version
+                shebang_exe = first_line[2:].strip().split()[0]
+                if os.path.isabs(shebang_exe):
+                    try:
+                        real_shebang = os.path.realpath(shebang_exe)
+                        shebang_match = re.search(r'(3\.\d+)', real_shebang)
+                        if shebang_match:
+                            shebang_version = shebang_match.group(1)
+                            logger.debug(f"Extracted shebang_version v{shebang_version} from realpath shebang in: {file_path}")
+                    except Exception:
+                        pass
+                
+                if not shebang_version:
+                    shebang_match = re.search(r'(3\.\d+)', first_line)
+                    if shebang_match:
+                        shebang_version = shebang_match.group(1)
+                        logger.debug(f"Extracted shebang_version v{shebang_version} from raw shebang in: {file_path}")
     except Exception as e:
         logger.debug(f"Failed to read shebang for {file_path}: {e}")
-        pass
         
-    logger.debug(f"Could not extract Python version for: {file_path}")
-    return None
+    return (path_version, shebang_version)
 
 def check_alignment(executable_path: str, command: str, active_python: str = None, args: list = None) -> dict:
     """
@@ -92,6 +104,14 @@ def check_alignment(executable_path: str, command: str, active_python: str = Non
                     tool_category=tool_env.get("category", "unknown")
                 )
         
+        # Consistency Check (AB Car check)
+        tool_path_version, tool_shebang_version = extract_python_version(tool_env["real_path"])
+        if tool_path_version and tool_shebang_version and tool_path_version != tool_shebang_version:
+            logger.warning(
+                f"結構異常：您執行的指令位於 {tool_path_version} 資料夾，但其內部 Shebang 卻指向 {tool_shebang_version}！\n"
+                f"這是一支損壞的墊片腳本 (Corrupted Wrapper)，建議您重新安裝此工具或重建虛擬環境。"
+            )
+
         # Scenario 1: User is in a venv, but the tool is global
         if current_env["is_venv"] and not tool_env["is_venv"]:
             if command in bypass_tools:
@@ -119,8 +139,11 @@ def check_alignment(executable_path: str, command: str, active_python: str = Non
                 
         if not current_env["is_venv"] and not tool_env["is_venv"]:
             logger.debug("Both environments are global. Performing version alignment check...")
-            current_version = extract_python_version(current_env["real_path"])
-            tool_version = extract_python_version(tool_env["real_path"])
+            current_path_v, current_shebang_v = extract_python_version(current_env["real_path"])
+            
+            # The execution version is dominated by shebang, if missing fallback to path version
+            current_version = current_shebang_v or current_path_v
+            tool_version = tool_shebang_version or tool_path_version
             
             if current_version and tool_version and current_version != tool_version:
                 tool_dir = os.path.dirname(tool_env['original_path'] if 'original_path' in tool_env else tool_env['real_path'])
