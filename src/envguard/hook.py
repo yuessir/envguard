@@ -108,8 +108,9 @@ def check_alignment(executable_path: str, command: str, active_python: str = Non
         tool_path_version, tool_shebang_version = extract_python_version(tool_env["real_path"])
         if tool_path_version and tool_shebang_version and tool_path_version != tool_shebang_version:
             logger.warning(
-                f"結構異常：您執行的指令位於 {tool_path_version} 資料夾，但其內部 Shebang 卻指向 {tool_shebang_version}！\n"
-                f"這是一支損壞的墊片腳本 (Corrupted Wrapper)，建議您重新安裝此工具或重建虛擬環境。"
+                f"[WARNING] Structural Anomaly: The command ({tool_env['real_path']}) is located in a python {tool_path_version} directory, "
+                f"but its internal Shebang points to python {tool_shebang_version}!\n"
+                f"This is a corrupted wrapper script. We recommend reinstalling this tool or deleting the file."
             )
 
         # Scenario 1: User is in a venv, but the tool is global
