@@ -172,6 +172,12 @@ EnvGuard 会将每个软件包分类为五种状态之一：
 - `[GHOST]`: “幽灵模块”。实体文件存在于 `site-packages` 中，但没有任何 metadata (`top_level.txt` 或 `RECORD`) 追踪它们。这通常发生在 OS 包管理器 (如 `apt` 或 `macports`) 强制植入软件包时，并会导致 `pip freeze` 遗漏这些依赖。
 - `[BAD WRAPPER]`: 损坏的可执行文件垫片。脚本内部的 Shebang 指向了外部非预期的 Python 环境 (仅在执行 `--scan-wrappers` 时扫描)。
 
+> [!NOTE]
+> **错位解析：`[CORRUPTED]` 与 `[BAD WRAPPER]` 的差异**
+> 两者皆为环境错位，但发生在不同层面：
+> - **`[CORRUPTED]` (内部软件包内容错位)**：发生在 `site-packages/`。软件包内包含了编译错误的 C/C++ 引擎 (如 `.so`)。症状：执行 `import` 时发生 `ImportError` 或 `Segmentation Fault`。
+> - **`[BAD WRAPPER]` (外部可执行文件垫片错位)**：发生在 `bin/`。可执行文件本身的 Shebang (`#!/path/to/python`) 指向错误的环境。症状：在终端输入指令时，由于使用错误的 Python 引擎启动，导致发生 `ModuleNotFoundError`。
+
 ## 调试 (Debugging)
 
 如果您遇到非预期的行为，或想了解 EnvGuard 是如何解析路径与分类的，您可以在任何指令前加上 `ENVGUARD_DEBUG=1` 来启用调试模式。

@@ -172,6 +172,12 @@ EnvGuard will classify each package into one of five states:
 - `[GHOST]`: "Phantom Modules". The physical files exist in `site-packages`, but there is no metadata (`top_level.txt` or `RECORD`) tracking them. This often happens when packages are forcibly injected by OS package managers (like `apt` or `macports`) and will cause `pip freeze` to miss them.
 - `[BAD WRAPPER]`: Corrupted wrapper scripts. The internal Shebang points to an unexpected external Python environment (only scanned when using `--scan-wrappers`).
 
+> [!NOTE]
+> **Misalignment Deep Dive: `[CORRUPTED]` vs `[BAD WRAPPER]`**
+> Both indicate a misalignment, but they happen at different levels:
+> - **`[CORRUPTED]` (Internal Package Corruption)**: Happens in `site-packages/`. The package contains compiled C/C++ engine files (like `.so`) built for the wrong python version. Symptom: Triggers `ImportError` or `Segmentation Fault` when you `import` the package.
+> - **`[BAD WRAPPER]` (External Script Corruption)**: Happens in `bin/`. The executable script itself has a Shebang (`#!/path/to/python`) pointing to the wrong python environment. Symptom: Triggers `ModuleNotFoundError` when you run the command in the terminal because it starts with the wrong Python engine.
+
 ## Debugging
 
 If you encounter unexpected behavior or want to understand how EnvGuard resolves paths and categories, you can enable the debug mode by prepending `ENVGUARD_DEBUG=1` to any command.

@@ -12,7 +12,8 @@
             "pyinstaller",
             "pytest",
             "celery",
-            "uvicorn"
+            "uvicorn",
+            "jupyter"
         ],
         "bypass_tools": [
             "uv",
