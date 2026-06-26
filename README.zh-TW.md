@@ -181,6 +181,14 @@ EnvGuard 會將每個套件分類為五種狀態之一：
 > - 🟢 **`[SAFE]`**: 腳本 `/venv/bin/pip`，其 Shebang 指向 `#!/venv/bin/python` (向內指向同一環境)。
 > - 🔴 **`[BAD WRAPPER]`**: 腳本 `/venv/bin/pip`，其 Shebang 卻指向 `#!/usr/bin/python` (向外指向外部環境)。
 
+## 常見問題與行為 (FAQ / Known Behaviors)
+
+### 為什麼我會看到 `[EnvGuard Warning] Detected alias for 'pip'...`？
+這表示 EnvGuard 偵測到您在 `~/.zshrc` 或 `~/.bashrc` 中手動設定了別名（例如 `alias pip=pip3`）或 Shell 函式（例如 conda/nvm 相關函式）。
+為了尊重您的客製化環境並防止破壞您的開發工作流，EnvGuard 會**主動退讓**，拒絕攔截並覆蓋該指令。
+*   **這樣防護會失效嗎？** 完全不會！當您的別名展開為 `pip3` 並執行時，EnvGuard 會精準地攔截並保護底層的 `pip3`。
+*   **如何消除這個警告？** 安裝 EnvGuard 後，您已經擁有原生的防錯位機制，不再需要手動將 `pip` 別名至 `pip3`。只需從您的 Shell 設定檔中刪除該別名，重啟終端機並再次執行 `envguard init` 即可。
+
 ## 除錯 (Debugging)
 
 如果您遇到非預期的行為，或想了解 EnvGuard 是如何解析路徑與分類的，您可以在任何指令前加上 `ENVGUARD_DEBUG=1` 來啟用除錯模式。

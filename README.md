@@ -182,6 +182,14 @@ EnvGuard will classify each package into one of five states:
 > - 🟢 **`[SAFE]`**: Script `/venv/bin/pip` has Shebang `#!/venv/bin/python` (points inward to its own environment).
 > - 🔴 **`[BAD WRAPPER]`**: Script `/venv/bin/pip` has Shebang `#!/usr/bin/python` (points outward to an external system environment).
 
+## FAQ / Known Behaviors
+
+### Why do I see `[EnvGuard Warning] Detected alias for 'pip'...`?
+This warning appears if you have manually defined a custom alias (e.g., `alias pip=pip3`) or a shell function (like those from `conda` or `nvm`) in your `~/.zshrc` or `~/.bashrc`. 
+To respect your custom environment and prevent breaking your workflow, EnvGuard **gracefully retreats** and refuses to overwrite your alias.
+*   **Is my system still protected?** Yes! If your alias expands to `pip3`, EnvGuard will intercept and protect the underlying `pip3` execution perfectly.
+*   **How do I clear the warning?** Since EnvGuard natively protects against version mismatches, manually aliasing `pip` to `pip3` is no longer necessary. Simply remove the alias from your shell configuration, restart your terminal, and run `envguard init`.
+
 ## Debugging
 
 If you encounter unexpected behavior or want to understand how EnvGuard resolves paths and categories, you can enable the debug mode by prepending `ENVGUARD_DEBUG=1` to any command.
